@@ -12,9 +12,9 @@ import (
 var DB *mongo.Database   // Variable global para la base de datos
 var client *mongo.Client // Cliente de MongoDB
 
-// ✅ Conectar a MongoDB
+// ✅ Conectar a MongoDB para CreateCustomer
 func ConnectDB() {
-	clientOptions := options.Client().ApplyURI("mongodb://54.158.252.115:27017/CustomerDB") // ⚠️ Verifica la IP de tu instancia EC2
+	clientOptions := options.Client().ApplyURI("mongodb://44.207.106.151:27017/CreateCustomerDB") // ⚠️ Reemplazar con la IP de EC2
 
 	var err error
 	client, err = mongo.Connect(context.TODO(), clientOptions)
@@ -29,7 +29,7 @@ func ConnectDB() {
 	}
 
 	fmt.Println("✅ Conexión exitosa a MongoDB")
-	DB = client.Database("CustomerDB") // ⚠️ Asegúrate de que el nombre de la base de datos es correcto
+	DB = client.Database("CreateCustomerDB") // ⚠️ Asegurar que el nombre es correcto
 }
 
 // ✅ Obtener colección asegurando que la conexión esté inicializada

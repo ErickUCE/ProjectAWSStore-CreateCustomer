@@ -1,8 +1,7 @@
 package routes
 
 import (
-	//"net/http"
-	"ProjectAWSStore-CreateCustomer/controllers" // ✅ Asegúrate de que el nombre del módulo es correcto
+	"ProjectAWSStore-CreateCustomer/controllers"
 
 	"github.com/gorilla/mux"
 )
@@ -13,10 +12,7 @@ func SetupRoutes() *mux.Router {
 
 	// Definir rutas
 	router.HandleFunc("/customers", controllers.CreateCustomer).Methods("POST")
-	router.HandleFunc("/customers", controllers.GetAllCustomers).Methods("GET")
-	router.HandleFunc("/customers/{id}", controllers.GetCustomerByID).Methods("GET")
-	router.HandleFunc("/customers/{id}", controllers.UpdateCustomer).Methods("PUT")
-	router.HandleFunc("/customers/{id}", controllers.DeleteCustomer).Methods("DELETE")
+	router.HandleFunc("/sync-create", controllers.SyncCreateCustomer).Methods("POST")
 
 	return router
 }

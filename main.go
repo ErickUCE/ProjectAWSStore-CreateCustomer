@@ -10,16 +10,15 @@ import (
 )
 
 func main() {
-	fmt.Println("🚀 Iniciando CustomerService en Golang...")
+	fmt.Println("🚀 Iniciando CreateCustomer Service en Golang...")
 
-	// ✅ Conectar a la base de datos MongoDB
+	// ✅ Conectar a la base de datos
 	config.ConnectDB()
 
-	// ✅ Configurar rutas
+	// ✅ Configurar rutas después de la conexión a la base de datos
 	router := routes.SetupRoutes()
 
-	// ✅ Cambiar el puerto si el 8080 ya está en uso
-	PORT := "8081" // Cambia el puerto aquí
-	fmt.Printf("✅ Servidor corriendo en el puerto %s\n", PORT)
-	log.Fatal(http.ListenAndServe(":"+PORT, router))
+	// ✅ Iniciar el servidor en el puerto 8081
+	fmt.Println("✅ Servidor corriendo en el puerto 8081")
+	log.Fatal(http.ListenAndServe(":8081", router))
 }
