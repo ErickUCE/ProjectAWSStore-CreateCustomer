@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -14,7 +15,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-// 📌 Verificar conexión antes de obtener la colección
 func getCustomerCollection() *mongo.Collection {
 	if config.DB == nil {
 		fmt.Println("❌ Error: La base de datos aún no está inicializada.")
@@ -23,7 +23,7 @@ func getCustomerCollection() *mongo.Collection {
 	return config.DB.Collection("customers")
 }
 
-// 📌 Crear un nuevo cliente
+// 📌 Crear un nuevo cliente y sincronizarlo con `ReadCustomer`
 func CreateCustomer(w http.ResponseWriter, r *http.Request) {
 	var customer models.Customer
 	err := json.NewDecoder(r.Body).Decode(&customer)
@@ -32,7 +32,6 @@ func CreateCustomer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// ✅ Verificar conexión antes de insertar
 	customerCollection := getCustomerCollection()
 	if customerCollection == nil {
 		http.Error(w, "Database not initialized", http.StatusInternalServerError)
@@ -48,8 +47,39 @@ func CreateCustomer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	fmt.Println("✅ Cliente creado:", customer.Email)
+
+	// 🔄 **Sincronizar con ReadCustomer**
+	go syncWithReadCustomer(customer)
+
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(customer)
+}
+
+// 📌 Función para enviar los datos a `ReadCustomer`
+func syncWithReadCustomer(customer models.Customer) {
+	readCustomerURL := "http://localhost:8082/sync-create" // ⚠️ URL del microservicio ReadCustomer
+
+	// Serializar el cliente en JSON
+	jsonData, err := json.Marshal(customer)
+	if err != nil {
+		fmt.Println("❌ Error serializando cliente:", err)
+		return
+	}
+
+	// Enviar petición HTTP
+	resp, err := http.Post(readCustomerURL, "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		fmt.Println("❌ Error notificando a ReadCustomer:", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusCreated {
+		fmt.Println("✅ Cliente sincronizado con ReadCustomer:", customer.Email)
+	} else {
+		fmt.Println("⚠️ No se pudo sincronizar cliente con ReadCustomer. Código:", resp.StatusCode)
+	}
 }
 
 // 📌 Sincronizar creación de clientes desde otro microservicio
