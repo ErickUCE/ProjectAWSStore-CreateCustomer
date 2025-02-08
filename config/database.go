@@ -4,38 +4,61 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 
+	"github.com/joho/godotenv"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-var DB *mongo.Database   // Variable global para la base de datos
-var client *mongo.Client // Cliente de MongoDB
+var DB *mongo.Database   // 🔥 Variable global para la base de datos
+var client *mongo.Client // 🔥 Cliente de MongoDB
 
-// ✅ Conectar a MongoDB para CreateCustomer
+// ✅ Conectar a MongoDB
 func ConnectDB() {
-	clientOptions := options.Client().ApplyURI("mongodb://44.207.106.151:27017/CreateCustomerDB") // ⚠️ Reemplazar con la IP de EC2
+	fmt.Println("📌 Ejecutando ConnectDB...")
 
-	var err error
-	client, err = mongo.Connect(context.TODO(), clientOptions)
+	// 🔥 Intentar cargar .env primero
+	err := godotenv.Load()
 	if err != nil {
-		log.Fatal("❌ Error conectando a MongoDB:", err)
+		fmt.Println("⚠️ No se pudo cargar el archivo .env, verificando variables de entorno...")
 	}
 
-	// Verificar conexión
-	err = client.Ping(context.TODO(), nil)
-	if err != nil {
-		log.Fatal("❌ Error haciendo ping a MongoDB:", err)
+	// 📌 Leer valores de .env o establecer valores predeterminados
+	mongoURI := os.Getenv("MONGO_URI")
+	mongoDBName := os.Getenv("MONGO_DB_NAME")
+
+	if mongoURI == "" || mongoDBName == "" {
+		log.Fatal("❌ ERROR: Las variables de entorno MONGO_URI o MONGO_DB_NAME están vacías.")
 	}
 
-	fmt.Println("✅ Conexión exitosa a MongoDB")
-	DB = client.Database("CreateCustomerDB") // ⚠️ Asegurar que el nombre es correcto
+	fmt.Println("🔗 URI cargada:", mongoURI)
+	fmt.Println("🛢  Base de datos:", mongoDBName)
+
+	// ✅ Configurar cliente de MongoDB
+	clientOptions := options.Client().ApplyURI(mongoURI)
+
+	var connectErr error
+	client, connectErr = mongo.Connect(context.TODO(), clientOptions)
+	if connectErr != nil {
+		log.Fatal("❌ Error conectando a MongoDB:", connectErr)
+	}
+
+	// ✅ Verificar conexión
+	pingErr := client.Ping(context.TODO(), nil)
+	if pingErr != nil {
+		log.Fatal("❌ Error haciendo ping a MongoDB:", pingErr)
+	}
+
+	// ✅ Asignar la base de datos
+	DB = client.Database(mongoDBName)
+	fmt.Println("✅ Conexión exitosa a MongoDB en", mongoDBName)
 }
 
 // ✅ Obtener colección asegurando que la conexión esté inicializada
 func GetCollection(collectionName string) *mongo.Collection {
 	if DB == nil {
-		log.Fatal("❌ Error: La base de datos no está inicializada. Asegúrate de llamar a ConnectDB() primero.")
+		log.Fatal("❌ Error: La base de datos no está inicializada. Llama a ConnectDB() primero.")
 	}
 	return DB.Collection(collectionName)
 }
