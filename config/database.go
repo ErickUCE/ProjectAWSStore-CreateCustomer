@@ -20,6 +20,7 @@ func ConnectDB() {
 
 	// 🔥 Intentar cargar .env primero
 	err := godotenv.Load()
+
 	if err != nil {
 		fmt.Println("⚠️ No se pudo cargar el archivo .env, verificando variables de entorno...")
 	}
@@ -55,10 +56,10 @@ func ConnectDB() {
 	fmt.Println("✅ Conexión exitosa a MongoDB en", mongoDBName)
 }
 
-// ✅ Obtener colección asegurando que la conexión esté inicializada
-func GetCollection(collectionName string) *mongo.Collection {
+// GetDB devuelve la instancia de la base de datos ya conectada
+func GetDB() *mongo.Database {
 	if DB == nil {
-		log.Fatal("❌ Error: La base de datos no está inicializada. Llama a ConnectDB() primero.")
+		log.Fatal("❌ Error: La base de datos no está inicializada. Asegúrate de llamar a ConnectDB() primero.")
 	}
-	return DB.Collection(collectionName)
+	return DB
 }
