@@ -62,6 +62,7 @@ func syncWithMicroservices(customer models.Customer) {
 	services := []string{
 		"http://localhost:8082/sync-create", // ReadCustomer
 		"http://localhost:8083/sync-create", // UpdateCustomer
+		"http://localhost:8084/sync-create", // UpdateCustomer
 	}
 
 	customerJSON, _ := json.Marshal(customer)
