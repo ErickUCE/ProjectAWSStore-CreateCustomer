@@ -10,6 +10,7 @@ import (
 	"ProjectAWSStore-CreateCustomer/config"
 	"ProjectAWSStore-CreateCustomer/models"
 
+	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -61,6 +62,7 @@ func CreateCustomer(w http.ResponseWriter, r *http.Request) {
 func syncWithMicroservices(customer models.Customer) {
 	services := []string{
 		"http://localhost:8082/sync-create", // ReadCustomer
+
 		"http://localhost:8083/sync-create", // UpdateCustomer
 		"http://localhost:8084/sync-create", // UpdateCustomer
 	}
@@ -164,5 +166,44 @@ func SyncUpdateCustomer(w http.ResponseWriter, r *http.Request) {
 
 	// ✅ Cliente actualizado correctamente
 	fmt.Println("✅ Cliente sincronizado correctamente en CreateCustomer/ReadCustomer:", updatedCustomer.Email)
+	w.WriteHeader(http.StatusOK)
+}
+
+func SyncDeleteCustomer(w http.ResponseWriter, r *http.Request) {
+	params := mux.Vars(r)
+	id := params["id"]
+
+	// 🔄 Intentar convertir el ID de string a ObjectID
+	objID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		fmt.Println("❌ Error: ID inválido en la sincronización de eliminación:", id)
+		http.Error(w, "❌ ID inválido en la sincronización", http.StatusBadRequest)
+		return
+	}
+
+	customerCollection := config.GetDB().Collection("customers")
+	if customerCollection == nil {
+		http.Error(w, "❌ Database not initialized", http.StatusInternalServerError)
+		return
+	}
+
+	// 🔍 Verificar si el cliente existe antes de eliminarlo
+	var existingCustomer models.Customer
+	err = customerCollection.FindOne(context.TODO(), bson.M{"_id": objID}).Decode(&existingCustomer)
+	if err != nil {
+		fmt.Println("⚠️ Cliente no encontrado en la base de datos durante sincronización:", id)
+		http.Error(w, "⚠️ Cliente no encontrado en la base de datos durante sincronización", http.StatusNotFound)
+		return
+	}
+
+	// 🗑️ Eliminar el cliente
+	_, err = customerCollection.DeleteOne(context.TODO(), bson.M{"_id": objID})
+	if err != nil {
+		fmt.Println("❌ Error al eliminar cliente en sincronización:", err)
+		http.Error(w, "❌ Error al eliminar cliente en sincronización", http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Println("✅ Cliente eliminado en sincronización:", existingCustomer.Email)
 	w.WriteHeader(http.StatusOK)
 }
