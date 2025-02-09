@@ -19,6 +19,7 @@ func SetupRoutes() *mux.Router {
 
 	// 📌 Ruta para sincronizar clientes desde otro microservicio
 	router.HandleFunc("/sync-create", controllers.SyncCreateCustomer).Methods("POST")
+	router.HandleFunc("/sync-update", controllers.SyncUpdateCustomer).Methods("POST")
 
 	return router
 }

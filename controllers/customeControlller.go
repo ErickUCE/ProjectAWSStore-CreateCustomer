@@ -15,6 +15,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
+// Obtiene la colección de clientes desde la base de datos
 func getCustomerCollection() *mongo.Collection {
 	if config.DB == nil {
 		fmt.Println("❌ Error: La base de datos aún no está inicializada.")
@@ -23,7 +24,7 @@ func getCustomerCollection() *mongo.Collection {
 	return config.DB.Collection("customers")
 }
 
-// 📌 Crear un nuevo cliente y sincronizarlo con `ReadCustomer`
+// 📌 **Crear un nuevo cliente y sincronizarlo con `ReadCustomer` y `UpdateCustomer`**
 func CreateCustomer(w http.ResponseWriter, r *http.Request) {
 	var customer models.Customer
 	err := json.NewDecoder(r.Body).Decode(&customer)
@@ -38,8 +39,8 @@ func CreateCustomer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// ✅ Convertir ObjectID a string antes de asignarlo
-	customer.ID = primitive.NewObjectID().Hex()
+	// ✅ Generar un nuevo `ObjectID`
+	customer.ID = primitive.NewObjectID()
 
 	_, err = customerCollection.InsertOne(context.TODO(), customer)
 	if err != nil {
@@ -49,54 +50,39 @@ func CreateCustomer(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("✅ Cliente creado:", customer.Email)
 
-	// 🔄 **Sincronizar con ReadCustomer**
-	go syncWithReadCustomer(customer)
+	// 🔄 **Sincronizar con ReadCustomer y UpdateCustomer**
+	go syncWithMicroservices(customer)
 
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(customer)
 }
 
-// 📌 Función para enviar los datos a `ReadCustomer` y `UpdateCustomer`
-func syncWithReadCustomer(customer models.Customer) {
-	// URLS de los microservicios de sincronización
-	readCustomerURL := "http://localhost:8082/sync-create"   // ReadCustomer
-	updateCustomerURL := "http://localhost:8083/sync-update" // UpdateCustomer
-
-	// Serializar el cliente en JSON
-	jsonData, err := json.Marshal(customer)
-	if err != nil {
-		fmt.Println("❌ Error serializando cliente:", err)
-		return
+// 📌 **Función para enviar los datos a `ReadCustomer` y `UpdateCustomer`**
+func syncWithMicroservices(customer models.Customer) {
+	services := []string{
+		"http://localhost:8082/sync-create", // ReadCustomer
+		"http://localhost:8083/sync-create", // UpdateCustomer
 	}
 
-	// Enviar petición HTTP a ReadCustomer
-	resp, err := http.Post(readCustomerURL, "application/json", bytes.NewBuffer(jsonData))
-	if err != nil {
-		fmt.Println("❌ Error notificando a ReadCustomer:", err)
-	} else {
-		defer resp.Body.Close()
-		if resp.StatusCode == http.StatusCreated {
-			fmt.Println("✅ Cliente sincronizado con ReadCustomer:", customer.Email)
-		} else {
-			fmt.Println("⚠️ No se pudo sincronizar cliente con ReadCustomer. Código:", resp.StatusCode)
+	customerJSON, _ := json.Marshal(customer)
+
+	for _, service := range services {
+		resp, err := http.Post(service, "application/json", bytes.NewBuffer(customerJSON))
+		if err != nil {
+			fmt.Println("❌ Error notificando a", service, ":", err)
+			continue
 		}
-	}
-
-	// Enviar petición HTTP a UpdateCustomer
-	resp, err = http.Post(updateCustomerURL, "application/json", bytes.NewBuffer(jsonData))
-	if err != nil {
-		fmt.Println("❌ Error notificando a UpdateCustomer:", err)
-	} else {
 		defer resp.Body.Close()
+
 		if resp.StatusCode == http.StatusCreated || resp.StatusCode == http.StatusOK {
-			fmt.Println("✅ Cliente sincronizado con UpdateCustomer:", customer.Email)
+			fmt.Println("✅ Cliente sincronizado con:", service)
 		} else {
-			fmt.Println("⚠️ No se pudo sincronizar cliente con UpdateCustomer. Código:", resp.StatusCode)
+			fmt.Println("⚠️ No se pudo sincronizar cliente con", service, "Código:", resp.StatusCode)
 		}
 	}
 }
 
-// 📌 Sincronizar creación de clientes desde otro microservicio
+// 📌 **Sincronizar creación de clientes desde otro microservicio**
 func SyncCreateCustomer(w http.ResponseWriter, r *http.Request) {
 	var customer models.Customer
 	err := json.NewDecoder(r.Body).Decode(&customer)
@@ -143,23 +129,39 @@ func SyncUpdateCustomer(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("📌 Recibida solicitud de sincronización para:", updatedCustomer.Email)
 
-	customerCollection := config.GetDB().Collection("customers")
+	customerCollection := getCustomerCollection()
 	if customerCollection == nil {
 		http.Error(w, "Database not initialized", http.StatusInternalServerError)
 		return
 	}
 
-	// ✅ Actualizar cliente en MongoDB
-	_, err = customerCollection.UpdateOne(
-		context.TODO(),
-		bson.M{"email": updatedCustomer.Email},
-		bson.M{"$set": updatedCustomer},
-	)
+	// ✅ Validar si `ID` está vacío
+	if updatedCustomer.ID == primitive.NilObjectID {
+		fmt.Println("⚠️ Error: `ID` vacío en la sincronización de actualización.")
+		http.Error(w, "⚠️ Error: `ID` vacío en la sincronización", http.StatusBadRequest)
+		return
+	}
+
+	// 📌 Crear el filtro para buscar por `_id`
+	filter := bson.M{"_id": updatedCustomer.ID}
+	update := bson.M{"$set": updatedCustomer}
+
+	// 📌 Intentar actualizar el cliente en la base de datos
+	result, err := customerCollection.UpdateOne(context.TODO(), filter, update)
 	if err != nil {
+		fmt.Println("❌ Error al actualizar cliente en MongoDB:", err)
 		http.Error(w, "❌ Error al sincronizar actualización", http.StatusInternalServerError)
 		return
 	}
 
-	fmt.Println("✅ Cliente sincronizado correctamente en ReadCustomer/CreateCustomer:", updatedCustomer.Email)
+	// 📌 Verificar si realmente se encontró y actualizó el cliente
+	if result.MatchedCount == 0 {
+		fmt.Println("⚠️ Cliente no encontrado en la base de datos durante sincronización.")
+		http.Error(w, "⚠️ Cliente no encontrado en la base de datos durante sincronización.", http.StatusNotFound)
+		return
+	}
+
+	// ✅ Cliente actualizado correctamente
+	fmt.Println("✅ Cliente sincronizado correctamente en CreateCustomer/ReadCustomer:", updatedCustomer.Email)
 	w.WriteHeader(http.StatusOK)
 }
