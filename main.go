@@ -9,13 +9,14 @@ import (
 	"ProjectAWSStore-CreateCustomer/config"
 	"ProjectAWSStore-CreateCustomer/routes"
 
+	"github.com/gorilla/handlers"
 	"github.com/joho/godotenv"
 )
 
 func main() {
-	fmt.Println("🚀 Iniciando CustomerService en Golang...")
+	fmt.Println("🚀 Iniciando CreateCustomerService en Golang...")
 
-	// 🔥 Intentar cargar el archivo `.env`
+	// 📌 Cargar variables de entorno
 	err := godotenv.Load()
 	if err != nil {
 		fmt.Println("⚠️ Advertencia: No se pudo cargar el archivo .env, verificando variables de entorno...")
@@ -42,6 +43,13 @@ func main() {
 	// ✅ Configurar rutas después de conectar a MongoDB
 	router := routes.SetupRoutes()
 
+	// 📌 Middleware CORS (✅ Ahora en la ubicación correcta)
+	handler := handlers.CORS(
+		handlers.AllowedOrigins([]string{"http://localhost:3000"}), // Permitir solo el frontend
+		handlers.AllowedMethods([]string{"GET", "POST", "PUT", "DELETE"}),
+		handlers.AllowedHeaders([]string{"Content-Type"}),
+	)(router)
+
 	// 📌 Obtener el puerto desde `.env`
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -50,5 +58,5 @@ func main() {
 
 	// ✅ Iniciar el servidor en el puerto definido en `.env`
 	fmt.Println("✅ Servidor corriendo en el puerto", port)
-	log.Fatal(http.ListenAndServe(":"+port, router))
+	log.Fatal(http.ListenAndServe(":"+port, handler)) // ✅ Ahora sí usa CORS
 }
