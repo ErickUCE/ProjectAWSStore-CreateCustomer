@@ -43,9 +43,11 @@ jobs:
         HOST: ${{ secrets.EC2_HOST }}
         USER: ${{ secrets.EC2_USER }}
       run: |
-        echo "$PRIVATE_KEY" > private_key.pem
+        # Guardar la clave privada en un archivo temporal y establecer permisos
+        echo "$PRIVATE_KEY" | tr -d '\r' > private_key.pem  # Quitar saltos de línea adicionales
         chmod 600 private_key.pem
-        ssh -i private_key.pem $USER@$HOST << 'EOF'
+        # Asegurarse de que la clave se maneje correctamente para la conexión SSH
+        ssh -T -o StrictHostKeyChecking=no -i private_key.pem $USER@$HOST << 'EOF'
           docker pull erickuce/projectawsstore-createcustomer:latest
           docker run -d -p 8081:8081 erickuce/projectawsstore-createcustomer:latest
         EOF
