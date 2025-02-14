@@ -61,10 +61,10 @@ func CreateCustomer(w http.ResponseWriter, r *http.Request) {
 // 📌 **Función para enviar los datos a `ReadCustomer` y `UpdateCustomer`**
 func syncWithMicroservices(customer models.Customer) {
 	services := []string{
-		"http://localhost:8082/sync-create", // ReadCustomer
+		"http://54.87.55.114:8082/sync-create", // ReadCustomer
 
-		"http://localhost:8083/sync-create", // UpdateCustomer
-		"http://localhost:8084/sync-create", // UpdateCustomer
+		"http://l44.217.27.149:8083/sync-create", // UpdateCustomer
+		"http://52.205.123.191:8084/sync-create", // UpdateCustomer
 	}
 
 	customerJSON, _ := json.Marshal(customer)
